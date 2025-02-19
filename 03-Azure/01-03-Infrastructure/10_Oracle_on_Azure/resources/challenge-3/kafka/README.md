@@ -3,6 +3,26 @@
 https://docs.confluent.io/kafka-connectors/oracle-cdc/current/prereqs-validation.html#connect-oracle-cdc-source-prereqs-user-privileges
 
 
+All required files should be already uploaded on the used VM servers under directory
+
+/challenge3
+    /kafka
+        /connectors
+        /plugins
+    /docker-compose
+    /oracle
+        /xe11grel2
+        /xe21c
+    /docker
+        /config
+        /data
+
+If files are missing use SCP command to copy them into on the remote linux docker-compose server
+
+From local to remote:
+    scp -C -i ./remoteServerKey.ppk -r <path_to_file> azuresuer@<ip>:/kafka
+Form remote to local:
+    scp -C -i ./remoteServerKey.ppk -r azureuser@<ip>:/kafka <path_to_file>
 
 
 ## Step 1: 
@@ -21,12 +41,18 @@ docker-compose logs zookeeper
 docker-compose logs kafka
 docker-compose logs connect
 
-If the container doesn't communicate well, you can delete existing created networks via:
+If the container doesn't communicate well and you are using docker networks, you can delete existing created networks via:
 
 ~~~bash
 docker network prune
 ~~~
-    
+
+
+~~~bash
+docker-compose up --build -d 'service_name'
+~~~
+
+
 
 ## Step 2:
 Configure the Oracle database 
@@ -44,6 +70,9 @@ su - oracle
 
 mkdir -p /u01/app/oracle/admin/dpdump
 chmod 755 /u01/app/oracle/admin/dpdump
+
+Change the path for the 21c Express Edition
+/opt/oracle/oradata/admin/ppdump
 
 
 sqlplus / as sysdba
@@ -275,6 +304,13 @@ WHERE OWNER = 'DEMO_SCHEMA';
 
 ### e: Create a database user for debezium
 
+There are different privileges required in Oracle for a replication with CDC. In general the privileges can be divided into:
+
+    a.  Basic ones, like connect, resource
+    b.  Directory access used for log mining
+    c.  Table and Catalog access
+
+
 ~~~bash
 CREATE USER debezium IDENTIFIED BY debezium;
 GRANT CONNECT, RESOURCE TO debezium;
@@ -290,8 +326,10 @@ GRANT LOGMINING TO debezium;
 
 
 For older databases like 11g rel.2 where the role logmining is not available grant the following roles:
+
 ~~~bash
 CREATE USER debezium IDENTIFIED BY debezium;
+
 GRANT READ, WRITE ON DIRECTORY logminer_dir TO debezium;
 GRANT CONNECT, RESOURCE TO debezium;
 GRANT SELECT ANY TABLE TO debezium;
@@ -307,10 +345,10 @@ GRANT CREATE SEQUENCE TO debezium;
 GRANT CREATE TRIGGER TO debezium;
 GRANT CREATE VIEW TO debezium;
 GRANT UNLIMITED TABLESPACE TO debezium;
+~~~
 
-
-~~~bash
 If the database user DEMO_SCHEMA is not already created during the DB part. If yes execute the ALTER commands.
+~~~bash
 
 CREATE USER demo_schema IDENTIFIED BY "password";
 
@@ -490,32 +528,32 @@ kafka-configs.sh --alter --entity-type topics --entity-name schema-changes.oracl
 
 # Step 5: Configure the oracle connector of Debezium
 
-oracle-connector.json
+oracle-source-connector-initial-Tableload-JDBC.json
     Identify the database.hostname by using docker inspect container-name (in our case oracle-xe)
 
-    {
-    "name": "oracle-connector",  // The name of the connector instance
-    "config": {
-        "connector.class": "io.debezium.connector.oracle.OracleConnector",  // The class for the Oracle connector
-        "tasks.max": "1",  // The maximum number of tasks to be created by this connector
-        "database.server.name": "oracle",  // Logical name for the database server, used for namespacing Kafka topics
-        "database.hostname": "172.20.0.3",  // Actual hostname or IP address of the Oracle database
-        "database.port": "1521",  // Port number where the Oracle database is listening
-        "database.user": "debezium",  // Username to connect to the Oracle database
-        "database.password": "debezium",  // Password to connect to the Oracle database
-        "database.dbname": "XE",  // Name of the Oracle database (SID)
-        "database.pdb.name": "XEPDB1",  // Name of the pluggable database (PDB) if applicable
-        "database.out.server.name": "dbzxout",  // Name of the Oracle LogMiner out server
-        "database.history.kafka.bootstrap.servers": "kafka:9092",  // Kafka bootstrap servers for storing database history
-        "database.history.kafka.topic": "schema-changes-oracle",  // Kafka topic for storing database schema history
-        "database.connection.adapter": "logminer",  // Adapter to use for capturing changes (LogMiner in this case)
-        "database.tablename.case.insensitive": "false",  // Whether table names are case insensitive
-        "database.history.store.only.monitored.tables.ddl": "true",  // Store DDL changes only for monitored tables
-        "database.history.skip.unparseable.ddl": "true"  // Skip unparseable DDL statements
-    }
-    }
+{
+  "name": "JdbcSourceConnectorConnector_0",
+  "config": {
+    "name": "JdbcSourceConnectorConnector_0",
+    "connector.class": "io.confluent.connect.jdbc.JdbcSourceConnector",
+    "tasks.max": "1",
+    "connection.url": "jdbc:oracle:thin:@48.209.90.102:1521/xe",
+    "connection.user": "demo_schema",
+    "connection.password": "********",
+    "table.whitelist": "ADDRESSES",
+    "catalog.pattern": "DEMO_SCHEMA",
+    "dialect.name": "OracleDatabaseDialect",
+    "mode": "bulk",
+    "table.types": "table"
+  }
+}
 
-Explanation of Each Variable:
+There are a lot of variables available with can be set for the connector definition. For demo purpose the configured connector will do an initial data load of a table from Oracle to Postgresql. Next to that CDC connectors can be used as well. In this case the demo data model needs to be extended and the table should have always primary keys and timestamp columns like (record created, changed).
+
+
+
+Following some explanations of variables available for the connector creation:
+
     name: The name of the connector instance.
     connector.class: The fully qualified class name of the connector.
     tasks.max: The maximum number of tasks that should be created for this connector.
@@ -536,7 +574,7 @@ Explanation of Each Variable:
 
 ---------------------------------------------------------------------------------------------------------
 
-# Step6: Connector registration in Debezium via curl 
+# Step6: Connector registration in Debezium / Confluent via curl 
 
 please consider the curl command in powershell vs bash / cmd looks different. The following curl command is for a BASH / CMD execution.
 
@@ -553,7 +591,7 @@ curl -X GET http://localhost:8083/connectors
 ~~~
 
 
-Option: How to delete the oracle debezium connector if required and recreate the one 
+Option: How to delete the oracle debezium /confluent connector if required and recreate the one 
 ~~~bash
 curl -X DELETE http://localhost:8083/connectors/oracle-connector
 ~~~
@@ -695,46 +733,33 @@ Following the output if you don't have any issues.
     Content-Length: 710
     Server: Jetty(9.4.44.v20210927)
 
-    {"name":"oracle-connector","config":
-        {"connector.class":
-                "io.debezium.connector.oracle.OracleConnector",
-            "tasks.max":
-                "1",
-            "database.server.name":
-                "oracle",
-            "database.hostname":
-                "oracle-xe1",
-            "database.port":
-                "1521",
-            "database.user":
-                "debezium",
-            "database.password":
-                "debezium",
-            "database.dbname":
-                "XE",
-            "database.pdb.name":
-                "XEPDB1",
-            "database.out.server.name":
-                "dbzxout",
-            "database.history.kafka.bootstrap.servers":
-            "kafka:9092",
-            "database.history.kafka.topic":
-                "schema-changes.oracle",
-            "database.connection.adapter":
-                "logminer",
-            "database.tablename.case.insensitive":
-                "false",
-            "database.history.store.only.monitored.tables.ddl":
-                "true",
-            "database.history.skip.unparseable.ddl":
-                "true",
-            "name":
-                "oracle-connector"
-            },
-            "tasks":[],
-            "type":
-                "source"
-    }
+
+        {
+
+        "name": "JdbcSourceConnectorConnector_0",
+
+        "config": {
+
+        "name": "JdbcSourceConnectorConnector_0",
+
+        "connector.class": "io.confluent.connect.jdbc.JdbcSourceConnector",
+
+        "tasks.max": "1",
+
+        "connection.url": "jdbc:oracle:thin:@<ip_address>:1521/demo_schema",
+
+        "connection.user": "demo_schema",
+
+        "connection.password": "*****",
+
+        "table.whitelist": "ADDRESSES",
+
+        "mode": "bulk"
+
+        }
+
+        }
+
 
 
 ## Step 6b: How to pause, resume and restart the connector
@@ -844,7 +869,7 @@ confluent_connect_configs
 confluent_connect_offsets
 confluent_connect_statuses
 oracle-connector
-oracle-connector.DEMO_SCHEMA.ADDRESSES
+__oracle-connector.DEMO_SCHEMA.ADDRESSES__
 oracle-connector.DEMO_SCHEMA.AUDIT_LOG
 oracle-connector.DEMO_SCHEMA.BANK_ACCOUNTS
 oracle-connector.DEMO_SCHEMA.DEPARTMENTS
@@ -866,26 +891,26 @@ Describe Topic
 
     create postgres-sink-connector.json file and add the following parameter:
 
-        {
-    "name": "postgres-sink-connector",
-    "config": {
-        "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
-        "tasks.max": "1",
-        "topics": "schema-changes.oracle",
-        "connection.url": "jdbc:postgresql://<azure-postgres-host>:5432/<database-name>",
-        "connection.user": "<username>",
-        "connection.password": "<password>",
-        "auto.create": "true",
-        "auto.evolve": "true",
-        "insert.mode": "upsert",
-        "pk.mode": "record_key",
-        "pk.fields": "id",
-        "delete.enabled": "false"
-            }
-        }
+{
+  "name": "postgres-sink-connector_0",
+  "config": {
+    "name": "postgres-sink-connector_0",
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "topics": "addresses",
+    "connection.url": "jdbc:postgresql://microhack.postgres.database.azure.com:5432/postgres",
+    "connection.user": "demo_schema",
+    "connection.password": "********",
+    "insert.mode": "INSERT",
+    "auto.create": "true",
+    "auto.evolve": "true"
+  }
+}
+
+__Please keep in mind the Topics will create the destination table in PostgreSQL Flexible server based naming (upper- or lower case).__
 
 
-name: The name of the connector.
+    name: The name of the connector.
     connector.class: The class name of the connector to use.
     tasks.max: The maximum number of tasks to create for this connector.
     topics: The Kafka topics to consume data from.
@@ -1031,3 +1056,50 @@ commit;
 ~~~bash
 /bin/kafka-console-consumer --bootstrap-server kafka:9092 --topic oracle-connector.DEMO_SCHEMA.EMPLOYEES --from-beginning
 ~~~
+
+
+# Moinitoring Kafka Cluster via available UI's
+
+1. Control-Center from Confluent
+2. KafDrop
+3. ...
+
+Following the monitoring of your Kafka Cluster will be done via Control-Center.
+
+
+## Connect monitoring
+<br>
+<br>
+<br>
+
+![Overview created connectors](picture/connectors.png)
+
+<br>
+<br>
+<br>
+
+![Created connectors for the initial data load](picture/connectors.png)
+
+<br>
+<br>
+<br>
+
+![Detail about the created topic addresses](picture/topic_addresses.png)
+
+<br>
+<br>
+<br>
+
+## Topics monitoring
+
+![Overview created Topics](picture/Overview_topics.png)
+
+<br>
+<br>
+<br>
+
+![Monitoring created topics](picture/topic.png)
+
+<br>
+<br>
+<br>
