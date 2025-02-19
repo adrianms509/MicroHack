@@ -13,7 +13,7 @@ NOTES.md
 # .tfstate files
 *.tfstate
 *.tfstate.*
-
+*.env
 # Crash log files
 crash.log
 
@@ -35,6 +35,8 @@ override.tf.json
 .terraformrc
 terraform.rc
 
+#-------- Ansible --------
+inventory
 
 # Ignore Terraform lock files
 *.lock.hcl
