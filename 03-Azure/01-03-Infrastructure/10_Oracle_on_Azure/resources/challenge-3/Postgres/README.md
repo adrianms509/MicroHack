@@ -51,7 +51,8 @@ DROP FOREIGN TABLE oracle_table;
 
 2. Connect via SQLPlus on the oracle database and create in our case a small demo table for the test case.
 ~~~bash
-Create the oracle_table
+## Create the oracle_table
+
 CREATE TABLE oracle_table (
     id NUMBER PRIMARY KEY,
     name VARCHAR2(100),

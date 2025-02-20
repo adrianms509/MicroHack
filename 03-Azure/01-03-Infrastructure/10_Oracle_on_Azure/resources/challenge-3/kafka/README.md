@@ -77,6 +77,31 @@ Change the path for the 21c Express Edition
 
 sqlplus / as sysdba
 
+CREATE USER demo_schema IDENTIFIED BY "password";
+GRANT CONNECT, RESOURCE TO demo_schema;
+~~~
+
+### Create database schema - see orcl_setup01_oracle_schema.sql
+
+If the datbase schema DEMO_SCHEMA is already created you can skip the step f and continue with step 3!
+Execute initial data load
+
+1. see [setup02_initial_dataload.sql](../../environment_setup/Oracle_Schema/setup01_oracle_schema.sql)
+2. see [setup01_oracle_schema.sql](../../environment_setup/Oracle_Schema/setup02_initial_dataload.sql)
+   
+verify the data load ingested the demo data successfully
+
+
+~~~bash
+SELECT count(*) FROM DEMO_SCHEMA.EMPLOYEES;
+
+    COUNT(*)
+    ----------
+    10000
+~~~
+
+
+
 Create demo table for testing purposes. See [ Demo table for Kafak setup ](./testtableforkafka.md)
 
 
@@ -350,9 +375,6 @@ GRANT UNLIMITED TABLESPACE TO debezium;
 If the database user DEMO_SCHEMA is not already created during the DB part. If yes execute the ALTER commands.
 ~~~bash
 
-CREATE USER demo_schema IDENTIFIED BY "password";
-
-GRANT CONNECT, RESOURCE TO demo_schema;
 ALTER USER demo_schema QUOTA UNLIMITED ON USERS;
 ALTER USER demo_schema QUOTA 1000M ON USERS;
 GRANT CONNECT, RESOURCE TO demo_schema;
@@ -388,26 +410,6 @@ GRANT EXECUTE ON SYS.DBMS_LOGMNR TO demo_schema;
 GRANT EXECUTE ON SYS.DBMS_LOGMNR_D TO demo_schema;
 ~~~
 
-
-### f. Create database schema - see orcl_setup01_oracle_schema.sql
-
-If the datbase schema DEMO_SCHEMA is already created you can skip the step f and continue with step 3!
-
-Execute initial data load
-
-1. see [setup02_initial_dataload.sql](../../environment_setup/Oracle_Schema/setup01_oracle_schema.sql)
-2. see [setup01_oracle_schema.sql](../../environment_setup/Oracle_Schema/setup02_initial_dataload.sql)
-   
-verify the data load ingested the demo data successfully
-
-
-~~~bash
-SELECT count(*) FROM DEMO_SCHEMA.EMPLOYEES;
-
-    COUNT(*)
-    ----------
-    10000
-~~~
 
 <br>
 <br>
