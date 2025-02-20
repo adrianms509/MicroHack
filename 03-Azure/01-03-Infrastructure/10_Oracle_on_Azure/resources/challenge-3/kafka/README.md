@@ -443,23 +443,24 @@ check the if the containers are reachable. if your are using docker on Windows u
 
  ~~~bash  
 
-docker exec -it kafka-zookeeper bash
+## If Zookeeper is used in Debezium for Confluent deployment not required because KRAFT is used.
+docker exec -it zookeeper bash
 
-nc -zv kafka-zookeeper 2181
+nc -zv zookeeper 2181
 
 Ncat: Version 7.92 ( https://nmap.org/ncat )
 Ncat: Connected to 172.18.0.2:2181.
 Ncat: 0 bytes sent, 0 bytes received in 0.01 seconds.
 
 
-nc -zv kafka-kafka 9092
+nc -zv broker 9092
 
 Ncat: Version 7.92 ( https://nmap.org/ncat )
 Ncat: Connected to 172.18.0.3:9092.
 Ncat: 0 bytes sent, 0 bytes received in 0.01 seconds.
 
 
-nc -zv kafka-connect 8083
+nc -zv connect 8083
 
 Ncat: Version 7.92 ( https://nmap.org/ncat )
 Ncat: Connected to 172.18.0.4:8083.
@@ -479,18 +480,18 @@ Ncat: 0 bytes sent, 0 bytes received in 0.01 seconds.
 1. open a new terminal/cmd and log into the kafka container
 
 ~~~bash   
-docker exec -it  kafka-kafka bash
+docker exec -it  broker bash
 ~~~        
 
 a. Create the test topic called test-topic
  ~~~bash   
  
-/bin/kafka-topics --create --topic test-topic --bootstrap-server kafka:9092 --partitions 1 --replication-factor 1
+/bin/kafka-topics --create --topic test-topic --bootstrap-server broker:9092 --partitions 1 --replication-factor 1
 ~~~
 
 b. Create a producer to send a test message
  ~~~bash          
-/bin/kafka-console-producer --broker-list kafka:9092 --topic test-topic
+/bin/kafka-console-producer --broker-list broker:9092 --topic test-topic
 
 Write in the producer the message: My first Kafka message!
 
@@ -499,18 +500,18 @@ Write in the producer the message: My first Kafka message!
 c. open a new terminal/cmd and log into the kafka container 
 
 ~~~bash   
-docker exec -it  kafka-kafka bash
+docker exec -it  broker bash
 ~~~
 
 d. Now we will consumed the previous meesage using kafka shell.
 
 ~~~bash   
-/bin/kafka-console-consumer --bootstrap-server kafka:9092 --topic test-topic --from-beginning
+/bin/kafka-console-consumer --bootstrap-server broker:9092 --topic test-topic --from-beginning
 ~~~
 
 e. Delete the topics
  ~~~bash  
-kafka-topics --delete --topic test-topic --bootstrap-server kafka:9092
+kafka-topics --delete --topic test-topic --bootstrap-server broker:9092
 ~~~
 
 
@@ -518,7 +519,7 @@ kafka-topics --delete --topic test-topic --bootstrap-server kafka:9092
 
 a. For later purpose potentially required 
 ~~~bash
-kafka-topics --delete --topic schema-changes-oracle --bootstrap-server kafka:9092
+kafka-topics --delete --topic schema-changes-oracle --bootstrap-server broker:9092
 ~~~
 
 b. set the retention time of a topic
@@ -583,7 +584,7 @@ please consider the curl command in powershell vs bash / cmd looks different. Th
 How to create or recreate the oracle debezium connector
 
 ~~~bash
-curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @oracle-connector-debezium.json
+curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @oracle-source-connector-initial-Tableload-JDBC.json
 ~~~
 
 
@@ -595,7 +596,7 @@ curl -X GET http://localhost:8083/connectors
 
 Option: How to delete the oracle debezium /confluent connector if required and recreate the one 
 ~~~bash
-curl -X DELETE http://localhost:8083/connectors/oracle-connector
+curl -X DELETE http://localhost:8083/connectors/JdbcSourceConnectorConnector_0
 ~~~
 
 
@@ -604,7 +605,7 @@ Error management in case the oracle-connector can not be registered
 If there are http 400 error you can test the oracle connection from the kafka-connect container by following the next steps:
 
 ~~~bash
-docker exec -it kafka-connect /bin/bash
+docker exec -it connect /bin/bash
 ~~~
 
 2. Create the following small java program:
@@ -644,7 +645,7 @@ javac -source 11 -target 11 .\OracleConnectionTest.java
 
 upload the compiled java class on the docker container
 ~~~bash
-docker cp .\OracleConnectionTest.class kafka-connect:/tmp
+docker cp .\OracleConnectionTest.class connect:/tmp
 ~~~   
 
 Execute the OracleConnectionTest file on the docker container
@@ -768,7 +769,7 @@ Following the output if you don't have any issues.
 
 ### Verify the connector status
 ~~~bash
-curl -X GET http://localhost:8083/connectors/oracle-connector/status
+curl -X GET http://localhost:8083/connectors/JdbcSourceConnectorConnector_0/status
 ~~~
 
 Output:
@@ -784,24 +785,25 @@ __In case the state flag is FAILED the connector needs to be DELETED and re-regi
 
 ### Pause the connector
 ~~~bash
-curl -X PUT http://localhost:8083/connectors/oracle-connector/pause
+curl -X PUT http://localhost:8083/connectors/JdbcSourceConnectorConnector_0/pause
 ~~~
 
 ### Resume the connector
 ~~~bash
-curl -X PUT http://localhost:8083/connectors/oracle-connector/resume
+curl -X PUT http://localhost:8083/connectors/JdbcSourceConnectorConnector_0/resume
 ~~~
 
 ### Alternatively, restart the connector
 ~~~bash
-curl -X POST http://localhost:8083/connectors/oracle-connector/restart
+curl -X POST http://localhost:8083/connectors/JdbcSourceConnectorConnector_0/restart
 ~~~
 
 ### Potentially you can to delete and register the connector again. How to delete the oracle debezium connector if required and recreate the one 
 ~~~bash
-curl -X DELETE http://localhost:8083/connectors/oracle-connector
+curl -X DELETE http://localhost:8083/connectors/JdbcSourceConnectorConnector_0
 
-curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @oracle-connector-debezium.json
+curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @oracle-source-connector-initial-Tableload-JDBC.json
+
 ~~~
 
 
@@ -817,6 +819,11 @@ docker logs <container-name>
 
 Check if all tables are logged for supplemental logging?!
 ~~~bash
+docker exec -it oracle-xe1 bash
+su - oracle
+
+sqlplus / as sysdba
+
 ALTER TABLE DEMO_SCHEMA.TEST_TABLE ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;
 ....
 ALTER TABLE DEMO_SCHEMA.AUDIT_LOG ADD SUPPLEMENTAL LOG DATA (ALL) COLUMNS;
@@ -830,16 +837,18 @@ Check against if the connection is still working properly.
 
 on windows / linux -> 
 ~~~bash
-curl -X GET http://localhost:8083/connectors/oracle-connector/status
+curl -X GET http://localhost:8083/connectors/JdbcSourceConnectorConnector_0/status
 
 on linux (need to install JQ) ->
 curl -s localhost:8083/connector-plugins|jq '.[].class'
+
+
 ~~~
 
 
 Output:
 
-    {"name":"oracle-connector",
+    {"name":"JdbcSourceConnectorConnector_0",
     "connector":
     {
         "state":"RUNNING",
@@ -862,7 +871,7 @@ You can check the status of your Kafka broker by listing the topics available in
 
 List Topics:
 ~~~bash
-docker exec -it kafka-kafka kafka-topics --bootstrap-server kafka:9092 --list
+docker exec -it broker topics --bootstrap-server broker:9092 --list
 ~~~
 
 Output:
@@ -892,6 +901,9 @@ Describe Topic
 # Step 9: Create a PostgreSQL sink connector
 
     create postgres-sink-connector.json file and add the following parameter:
+
+Registered the postgreSQL JDBC sink connector postgres-sink-connector-intial-Tableload-JDBC.json
+
 
 {
   "name": "postgres-sink-connector_0",
@@ -941,18 +953,18 @@ ALTER ROLE demo_schema SET search_path TO demo_schema, public;
 
 ## Register the postgreSQL sink connector
 ~~~bash
-curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @postgres-sink-connector.json
+curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @postgres-sink-connector-intial-Tableload-JDBC.json
 ~~~
 
     output:
     HTTP/1.1 201 Created
     Date: Mon, 27 Jan 2025 09:49:42 GMT
-    Location: http://localhost:8083/connectors/postgres-sink-connector
+    Location: http://localhost:8083/connectors/postgres-sink-connector_0
     Content-Type: application/json
     Content-Length: 497
     Server: Jetty(9.4.44.v20210927)
 
-    {"name":"postgres-sink-connector","config":
+    {"name":"postgres-sink-connector_0","config":
     {"connector.class":
     "io.confluent.connect.jdbc.JdbcSinkConnector","tasks.max":
     "1","topics":
@@ -964,27 +976,27 @@ curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" 
 
 ## Verify that connector is running 
 ~~~bash
-curl -X GET http://localhost:8083/connectors/postgres-sink-connector/status
+curl -X GET http://localhost:8083/connectors/postgres-sink-connector_0/status
 ~~~
 
 If required Delete and re-register the connector again.
 ~~~bash
-curl -X DELETE http://localhost:8083/connectors/postgres-sink-connector
+curl -X DELETE http://localhost:8083/connectors/postgres-sink-connector_0
 
-curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @postgres-sink-connector.json
+curl -i -X POST -H "Accept:application/json" -H "Content-Type:application/json" http://localhost:8083/connectors/ -d @postgres-sink-connector-intial-Tableload-JDBC.json
 ~~~
 
 
 Output:
-{"name":"postgres-sink-connector","connector":{"state":"RUNNING","worker_id":"172.18.0.4:8083"},"tasks":[{"id":0,"state":"RUNNING","worker_id":"172.18.0.4:8083"}],"type":"sink"}
+{"name":"postgres-sink-connector_0","connector":{"state":"RUNNING","worker_id":"172.18.0.4:8083"},"tasks":[{"id":0,"state":"RUNNING","worker_id":"172.18.0.4:8083"}],"type":"sink"}
 
 
 
 # Step 10: Monitoring of the data replication 
 
-Connect into the kafka-kafka container
+Connect into the broker container
 ~~~bash
-docker exec -it kafka-kafka bash
+docker exec -it broker bash
 ~~~
      
 
