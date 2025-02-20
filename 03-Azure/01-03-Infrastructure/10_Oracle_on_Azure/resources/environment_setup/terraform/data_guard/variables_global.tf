@@ -4,12 +4,12 @@
 variable "location" {
   description = "Defines the Azure location where the resources will be deployed"
   type        = string
-  default     = "germanywestcentral"
+  default     = "swedencentral"
 }
 
 variable "resourcegroup_name" {
   description = "If defined, the name of the resource group into which the resources will be deployed"
-  default     = "rg-mh-oracle4"
+  default     = "rg-mh-oracle"
 }
 
 variable "resourcegroup_tags" {
