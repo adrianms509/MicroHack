@@ -210,6 +210,65 @@ The ansible playbook will configure the guest OS of the created VM, download and
 
 ### Task 4: Setup dataguard to sync source database to the newly created Azure VM 
 
+Connect to the VM you created
+```bash
+ssh -i ~/.ssh/oracle_vm_rsa_id adminuser@<replace-with-your-public-ip>
+su oracle
+
+# check whether ORACLE_HOME and ORACLE_SID have been set correctly
+echo $ORACLE_HOME
+echo $ORACLE_SID
+```
+If prompted for passphrase/password type those and confirm with enter.
+
+Create/update the file $ORACLE_HOME/network/admin/tnsnames.ora with your favorite editor - i.e. vim. Because DNS resolution has not been set up in the microhack environment use the public IP address of your primary host instead of the host name.
+```bash
+ORCL =
+  (DESCRIPTION =
+    (ADDRESS_LIST =
+      (ADDRESS = (PROTOCOL = TCP)(HOST = <replace-with-public-ip-of-primary-host>)(PORT = 1521))
+    )
+    (CONNECT_DATA =
+      (SID = ORCL)
+    )
+  )
+ 
+ORCLDG2 =
+  (DESCRIPTION =
+    (ADDRESS_LIST =
+      (ADDRESS = (PROTOCOL = TCP)(HOST = ora-vm)(PORT = 1521))
+    )
+    (CONNECT_DATA =
+      (SID = ORCLDG2)
+    )
+  )
+```
+
+Create/update the file $ORACLE_HOME/network/admin/listener.ora with your favorite editor - i.e. vim. Verify that your host is called 'ora-vm' or change the value here accordingly. The same is valid for ORACLE_HOME. 
+```bash
+LISTENER =
+  (DESCRIPTION_LIST =
+    (DESCRIPTION =
+      (ADDRESS = (PROTOCOL = TCP)(HOST = ora-vm)(PORT = 1521))
+      (ADDRESS = (PROTOCOL = IPC)(KEY = EXTPROC1521))
+    )
+  )
+SID_LIST_LISTENER =
+  (SID_LIST =
+    (SID_DESC =
+      (GLOBAL_DBNAME = ORCLDG2)
+      (ORACLE_HOME = /u01/app/oracle/product/19.3.0/dbhome_1)
+      (SID_NAME = ORCLDG2)
+    )
+  )
+```
+
+Restart the listener:
+```bash
+lsnrctl stop
+lsnrctl start
+```
+
 ### Task 5 (optional): Set the database hosted in Azure as the new primary 
 
 
