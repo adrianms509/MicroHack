@@ -177,8 +177,6 @@ variable "data_disk_config" {
 ```
 Save the changes you made.
 
-#### TODO: Add the fixtures.tfvars containing the User Managed Identity of the storage account.
-
 5. Deploy your Azure resources
 
 ```bash
@@ -194,7 +192,7 @@ Wait for the resources to get created. This may take several minutes. Then, go t
 
 ### **Task 3: Configure Oracle DB single instance via Ansible**
 
-Next, we need to configure the OS of the VM.
+Next, we need to configure the OS of the VM and install the Oracle 19c binaries.
 
 1. Switch to the ansible bootstrap subdirectory for oracle:
 
@@ -206,13 +204,21 @@ Open the inventory file and replace the \<Public IP address of Azure vm created 
 ```bash
 ansible-playbook -i ./inventory playbook.yml
 ```
-The ansible playbook will configure the guest OS of the created VM, download and install oracle 19c binaries and create a database.
+The ansible playbook will configure the guest OS of the created VM, download and install oracle 19c binaries.
 
 TODO: Measure duration without dbca script
 
 **Note: The creation of the database takes pretty long, so the ansible playbook takes ~45min to execute. We recommend to continue with another challenge to use the microhack time most effectively.** 
 
-### Task 4: Create database from RMAN backup
+### Task 4: Backup onprem database and restore it on Azure VM using RMAN
+
+Connect to the primary onprem Oracle VM and check if there are backups we can use. 
+
+If this is not the case initiate backup.
+
+Copy the backup files to the target VM in Azure.
+
+Login to target VM in Azure, create required folders, make required changes in files and restore database from backup files.
 
 ### Task 5: Setup dataguard to sync source database to the newly created Azure VM 
 
