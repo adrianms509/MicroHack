@@ -69,6 +69,8 @@ Here are the detailed steps for the deployment:
 
 1. Create a key pair for SSH login:
 
+TODO: rework to use keys from Keyvault provided by environment setup
+
 ```bash
 ssh-keygen -f ~/.ssh/oracle_vm_rsa_id
 ``` 
@@ -206,9 +208,13 @@ ansible-playbook -i ./inventory playbook.yml
 ```
 The ansible playbook will configure the guest OS of the created VM, download and install oracle 19c binaries and create a database.
 
+TODO: Measure duration without dbca script
+
 **Note: The creation of the database takes pretty long, so the ansible playbook takes ~45min to execute. We recommend to continue with another challenge to use the microhack time most effectively.** 
 
-### Task 4: Setup dataguard to sync source database to the newly created Azure VM 
+### Task 4: Create database from RMAN backup
+
+### Task 5: Setup dataguard to sync source database to the newly created Azure VM 
 
 Connect to the VM you created
 ```bash
